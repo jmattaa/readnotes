@@ -107,6 +107,8 @@ body::before{ /* faint paper grain */
 
 #view{ min-height:calc(100vh - 140px); padding: clamp(22px,5vw,52px) clamp(16px,4vw,40px) 72px; }
 #view:focus{ outline:none; }
+.sitespan{ padding:8px clamp(16px,4vw,40px) 40px; text-align:center; }
+.sitespan p{ font-family:var(--mono); font-size:11px; letter-spacing:.05em; color:var(--ink-faint); margin:0; }
 
 .shelf-title{ font-family:var(--serif); font-weight:500; font-size:clamp(28px,4vw,40px); line-height:1.1; margin:0 0 26px; letter-spacing:-.01em; }
 
@@ -291,6 +293,17 @@ body::before{ /* faint paper grain */
 }
 .cp-folio input::-webkit-outer-spin-button,.cp-folio input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 .cp-folio input:focus{ outline:none; color:var(--accent-deep); }
+.cp-folio .cp-dash{ color:var(--ink-faint); display:none; font-size:13px; }
+.cp-folio input[name="pageEnd"]{ display:none; }
+.composer.spanning .cp-folio .cp-dash,
+.composer.spanning .cp-folio input[name="pageEnd"]{ display:inline-flex; }
+.cp-span{
+  font-family:var(--mono); font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--ink-faint); background:transparent; border:0; padding:3px 2px;
+  opacity:.45; transition:opacity .16s ease, color .16s ease;
+}
+.composer:focus-within .cp-span{ opacity:1; }
+.cp-span:hover{ color:var(--accent-deep); }
 .cp-text{
   font-family:var(--serif); font-size:16.5px; line-height:1.55; color:var(--ink);
   background:transparent; border:0; outline:none; resize:none; overflow:hidden;
@@ -325,7 +338,7 @@ body::before{ /* faint paper grain */
 .ledger{ list-style:none; margin:0; padding:0; }
 .note{
   display:grid;
-  grid-template-columns:64px 1fr;
+  grid-template-columns:minmax(64px,auto) 1fr;
   gap:clamp(14px,2.6vw,26px);
   padding:22px 0;
   border-top:1px solid var(--line);
@@ -334,7 +347,7 @@ body::before{ /* faint paper grain */
 .note:first-child{ border-top:0; }
 .folio{
   font-family:var(--mono); font-size:13px; letter-spacing:.05em; color:var(--ink-faint);
-  padding-top:2px; text-align:right;
+  padding-top:2px; text-align:right; white-space:nowrap;
 }
 .folio .para{ display:block; width:16px; height:16px; margin:5px 0 0 auto; }
 .folio .para svg{ width:100%; height:100%; }
@@ -417,7 +430,7 @@ dialog form{ padding:18px 22px 22px; display:grid; gap:14px; }
   .cp-actions{ grid-column:1; justify-content:flex-end; width:100%; }
   .cp-thumbs{ grid-column:1; }
   .status-stamp{ top:9px; right:9px; }
-  .note{ grid-template-columns:44px 1fr; gap:12px; }
+  .note{ grid-template-columns:minmax(44px,auto) 1fr; gap:12px; }
   .folio{ font-size:12px; }
   .field-row{ grid-template-columns:1fr; }
 }

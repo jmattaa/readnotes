@@ -28,11 +28,28 @@ function save() {
     localStorage.setItem(STORE_KEY, raw);
     if (raw.length > QUOTA_WARN_BYTES)
       toast("The library is getting heavy — export a backup and remove old photos.", true);
+    updateFootnote();
     return true;
   } catch (e) {
     toast("Storage is full — remove an image or trim an old note.", true);
     return false;
   }
+}
+function storageUsedBytes() {
+  let bytes = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    bytes += new Blob([k, "\n", localStorage.getItem(k)]).size;
+  }
+  return bytes;
+}
+const fmtBytes = (bytes) =>
+  bytes >= 1 << 20 ? (bytes / (1 << 20)).toFixed(1) + " MB"
+  : bytes >= 1 << 10 ? Math.round(bytes / (1 << 10)) + " KB"
+  : bytes + " B";
+function updateFootnote() {
+  const el = $("#footnote");
+  if (el) el.textContent = `${fmtBytes(storageUsedBytes())} used`;
 }
 function loadState() {
   try {
@@ -231,10 +248,14 @@ function nextPageFor(book) {
 function noteLineEl(book, n) {
   const li = el("li", "note");
   li.dataset.page = n.page;
-  const imgs = (n.images || []).map(src => `<img src="${src}" alt="Photo on page ${n.page}" loading="lazy">`).join("");
+  const label = n.end ? `${n.page}–${n.end}` : `${n.page}`;
+  const alt = n.end ? `Photo on pages ${n.page}–${n.end}` : `Photo on page ${n.page}`;
+  const actionLabel = n.end ? `Edit the note on pages ${n.page}–${n.end}` : `Edit the note on page ${n.page}`;
+  const delLabel = n.end ? `Delete the note on pages ${n.page}–${n.end}` : `Delete the note on page ${n.page}`;
+  const imgs = (n.images || []).map(src => `<img src="${src}" alt="${alt}" loading="lazy">`).join("");
   li.innerHTML = `
     <div class="folio">
-      ${n.page}<span class="para" aria-hidden="true"><svg viewBox="0 0 12 18"><path d="M0 0h6v15l3-2.2 3 2.2V0h-6v13.4c-2-1.5-4.6-1.7-6-.6z" fill="var(--accent)" opacity=".85"/></svg></span>
+      ${label}<span class="para" aria-hidden="true"><svg viewBox="0 0 12 18"><path d="M0 0h6v15l3-2.2 3 2.2V0h-6v13.4c-2-1.5-4.6-1.7-6-.6z" fill="var(--accent)" opacity=".85"/></svg></span>
     </div>
     <div class="note-body">
       <p class="note-text">${esc(n.text)}</p>
@@ -242,8 +263,8 @@ function noteLineEl(book, n) {
       <div class="note-meta">
         <time datetime="${new Date(n.updatedAt).toISOString()}">${fmtDate(n.updatedAt)}</time>
         <span class="note-actions">
-          <button class="iconbtn" type="button" data-act="edit-note" data-page="${n.page}" aria-label="Edit note on page ${n.page}">${icon("edit").outerHTML}</button>
-          <button class="iconbtn" type="button" data-act="delete-note" data-page="${n.page}" aria-label="Delete note on page ${n.page}">${icon("trash").outerHTML}</button>
+          <button class="iconbtn" type="button" data-act="edit-note" data-page="${n.page}" aria-label="${actionLabel}">${icon("edit").outerHTML}</button>
+          <button class="iconbtn" type="button" data-act="delete-note" data-page="${n.page}" aria-label="${delLabel}">${icon("trash").outerHTML}</button>
         </span>
       </div>
     </div>`;
@@ -258,6 +279,10 @@ function composerEl(book) {
       <span class="para"><svg viewBox="0 0 12 18"><path d="M0 0h6v15l3-2.2 3 2.2V0h-6v13.4c-2-1.5-4.6-1.7-6-.6z" fill="var(--accent)" opacity=".85"/></svg></span>
       <input type="number" inputmode="numeric" name="page" min="1" max="${book.totalPages || 99999}"
              value="${nextPageFor(book)}" aria-label="Page number">
+      <span class="cp-dash">–</span>
+      <input type="number" inputmode="numeric" name="pageEnd" min="1" max="${book.totalPages || 99999}"
+             aria-label="End page of the span">
+      <button class="cp-span" type="button" data-act="toggle-span">span</button>
     </span>
     <textarea class="cp-text" name="text" rows="1" placeholder="A line worth keeping…" aria-label="Note"></textarea>
     <div class="cp-actions">
@@ -285,12 +310,16 @@ function openNoteForm(book, page, note) {
   const f = $(".composer", $("#view"));
   const text = f.querySelector(".cp-text");
   const pinput = f.querySelector('input[name="page"]');
+  const einput = f.querySelector('input[name="pageEnd"]');
   editingNotePage = note ? note.page : null;
   pendingImages = note && note.images ? [...note.images] : [];
   pinput.value = page;
   pinput.max = book.totalPages || 99999;
-  text.value = note ? note.text : "";
+  einput.value = note && note.end ? note.end : "";
+  einput.max = book.totalPages || 99999;
   f.classList.toggle("editing", !!note);
+  f.classList.toggle("spanning", !!(note && note.end));
+  text.value = note ? note.text : "";
   autosize(text);
   renderThumbs();
   text.focus();
@@ -313,11 +342,13 @@ function closeNoteForm() {
   if (f) {
     const b = state.books.find(x => x.id === currentBookId());
     const page = f.querySelector('input[name="page"]');
+    const einput = f.querySelector('input[name="pageEnd"]');
     f.querySelector(".cp-text").value = "";
     pendingImages = [];
     editingNotePage = null;
-    f.classList.remove("editing");
+    f.classList.remove("editing", "spanning");
     if (b) { page.value = nextPageFor(b); page.max = b.totalPages || 99999; }
+    einput.value = "";
     autosize(f.querySelector(".cp-text"));
     renderThumbs();
   }
@@ -408,27 +439,29 @@ function removeBook(bookId) {
   toast("Book removed from the shelf");
 }
 
-function saveNote(bookId, page, text) {
+function saveNote(bookId, page, end, text) {
   const b = state.books.find(x => x.id === bookId);
   if (!b) return;
-  page = clamp(Math.round(Number(page) || 1), 1, b.totalPages || 1);
+  const total = b.totalPages || 1;
+  page = clamp(Math.round(Number(page) || 1), 1, total);
+  end = parseInt(end, 10);
+  end = !isNaN(end) && end > page ? clamp(end, page + 1, total) : null;
   const conflict = b.notes.find(n => n.page === page && n.page !== editingNotePage);
-  if (conflict) { toast(`A note already exists on page ${page}.`, true); return; }
+  if (conflict) { toast(`A note already starts on page ${page}.`, true); return; }
   if (!text.trim() && pendingImages.length === 0) { toast("Write something or attach a photo first.", true); return; }
 
   const idx = b.notes.findIndex(n => n.page === editingNotePage);
-  if (idx >= 0) {
-    b.notes[idx] = { page, text: text.trim(), images: pendingImages, updatedAt: Date.now() };
-  } else {
-    b.notes.push({ page, text: text.trim(), images: pendingImages, updatedAt: Date.now() });
-  }
-  b.currentPage = page;               // the note IS the progress — page N is now "read to"
+  const note = { page, text: text.trim(), images: pendingImages, updatedAt: Date.now() };
+  if (end) note.end = end;
+  if (idx >= 0) b.notes[idx] = note;
+  else b.notes.push(note);
+  b.currentPage = end || page;           // spans read through to their end page
   b.updatedAt = Date.now();
   pendingImages = [];
   editingNotePage = null;
   save();
   renderBook(bookId);
-  toast(`Note saved — now reading page ${page}`);
+  toast(end ? `Note saved — now reading pages ${page}–${end}` : `Note saved — now reading page ${page}`);
 }
 
 function deleteNote(bookId, page) {
@@ -603,6 +636,20 @@ document.addEventListener("click", async (e) => {
     const box = $(".nf-files", $("#view"));
     if (box) box.click();
   }
+  else if (act === "toggle-span") {
+    e.preventDefault();
+    const f = e.target.closest(".composer");
+    if (!f) return;
+    const spanning = f.classList.toggle("spanning");
+    const einput = f.querySelector('input[name="pageEnd"]');
+    if (!spanning) { einput.value = ""; }
+    else {
+      const start = parseInt(f.querySelector('input[name="page"]').value, 10) || 1;
+      const max = parseInt(f.querySelector('input[name="page"]').max, 10) || 1;
+      einput.value = Math.min(start + 1, max);
+      einput.focus();
+    }
+  }
   else if (act === "note-cancel") closeNoteForm();
   else if (act === "confirm-yes") { if (confirmAction) { confirmAction(); confirmAction = null; } confirmDialog.close(); }
   else if (act === "confirm-no") { confirmAction = null; confirmDialog.close(); }
@@ -659,7 +706,7 @@ document.addEventListener("submit", (e) => {
   if (f && f.classList.contains("composer")) {
     e.preventDefault();
     const id = currentBookId();
-    saveNote(id, f.querySelector('input[name="page"]').value, f.querySelector(".cp-text").value);
+    saveNote(id, f.querySelector('input[name="page"]').value, f.querySelector('input[name="pageEnd"]').value, f.querySelector(".cp-text").value);
   }
   if (f && f.id === "book-form") {
     const data = Object.fromEntries(new FormData(f).entries());
@@ -688,5 +735,6 @@ document.addEventListener("keydown", (e) => {
 
 /* ---------- boot ---------- */
 loadState();
+updateFootnote();
 route();
 window.addEventListener("hashchange", route);
