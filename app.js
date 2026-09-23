@@ -125,6 +125,17 @@ const esc = (s) => String(s ?? "")
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
   .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
+const LINK_RE = /\[([^\]\n]*?)\]\(((?:https?:\/\/|www\.)[^\s)]+)\)|((?:https?:\/\/|www\.)\S+)/g;
+const linkHref = (u) => /^www\./i.test(u) ? "https://" + u : u;
+function renderNoteText(text) {
+  return esc(text).replace(LINK_RE, (m, label, surf, bare) => {
+    const url = (surf || bare).replace(/[.,;:!?"'’)\]]+$/, "");
+    const href = linkHref(url);
+    const shown = surf ? (label || url).trim() : url;
+    return `<a class="note-link" href="${href}" target="_blank" rel="noopener noreferrer">${shown}</a>`;
+  });
+}
+
 /* ---------- views ---------- */
 function renderLibrary() {
   const view = $("#view");
@@ -258,7 +269,7 @@ function noteLineEl(book, n) {
       ${label}<span class="para" aria-hidden="true"><svg viewBox="0 0 12 18"><path d="M0 0h6v15l3-2.2 3 2.2V0h-6v13.4c-2-1.5-4.6-1.7-6-.6z" fill="var(--accent)" opacity=".85"/></svg></span>
     </div>
     <div class="note-body">
-      <p class="note-text">${esc(n.text)}</p>
+      <p class="note-text">${renderNoteText(n.text)}</p>
       ${imgs ? `<div class="note-images">${imgs}</div>` : ""}
       <div class="note-meta">
         <time datetime="${new Date(n.updatedAt).toISOString()}">${fmtDate(n.updatedAt)}</time>

@@ -57,6 +57,8 @@ One authored moment: the ribbon-fill unrolls along a `scaleX` transform (linear-
 
 **The note is the progress.** Saving a note at page N moves the current page to N. One source of truth (the page number), two entry points (header page-set, composer page chip) — no separate "mark as read" button, because both acts are the same act. A **span note** (optional `end` on the note) covers pages N–M and reads through to M, so the next composer page starts at M+1. Compose flow is friction-free: the composer is always open at the next free page, Enter saves, and the ledger re-renders beneath it.
 
+**Note text is tiny HTML.** One rule: paste a URL into a note and it renders as a clickable link; `[Text shown](url)` replaces the URL with your own label (songs, articles, anything you want to keep). Both happen at render time — the stored note is always plain text, so exports stay readable and the composer shows exactly what you wrote.
+
 ## State & persistence
 
 Single key `readnotes.v1` → `{ books: [{ id, title, author, totalPages, currentPage, status, notes:[{page,end?,text,images,updatedAt}], createdAt, updatedAt }] }`. `end` is optional and marks a page-span note (poor page is the anchor/sort key; single-page notes may sit anywhere, spans may overlap). Images downscaled to 1200px/WebP before being stored as data URLs; a soft warn fires past ~4.2MB, a hard `QuotaExceededError` guard toasts without corrupting state. JSON export (dated download) / import (merge by id) in the appbar. Routes: `#/` shelf, `#/book/:id`.

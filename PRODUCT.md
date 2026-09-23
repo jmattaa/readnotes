@@ -32,6 +32,7 @@ Used in a browser as a static page. Reading is done a page at a time: reader upd
 - Progress percent is derived from current page and total pages.
 - Current page is set two ways (both drive one value): a page-number field in the book header, and saving a note at a given page.
 - Notes anchor to a page; one note per starting page. A note may optionally be a page-span note (one note covering a range, shown as "p. N–M"), while single-page notes can still be made on any page inside that span.
+- A pasted URL in a note renders as a clickable link; wrap one as `[Text shown](url)` to replace the URL with your own label (great for songs, articles, anything from the web). Notes stay plain text.
 - Notes are always displayed sorted ascending by page number.
 - Reading status is user-settable (Reading / Finished / Dropped).
 - Images are downscaled client-side (max ~1200px long edge, WebP/JPEG) and stored as data URLs; large storage is protected by a quota guard with a clear message.
